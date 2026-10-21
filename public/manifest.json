@@ -1,0 +1,10 @@
+{
+  "name": "Energy Lens",
+  "short_name": "Energy Lens",
+  "description": "Organize energy assessment field photos by site and equipment, stored in Google Drive.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#171717",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
