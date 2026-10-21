@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Energy Lens"
+abstract: >-
+  Energy Lens is a mobile-friendly web app for organizing industrial energy
+  assessment field photos by site, equipment type, and piece of equipment.
+  Photos are tagged, stored in the user's Google Drive, shared with teammates,
+  and exported as PDF reports or ZIP archives.
+authors:
+  - given-names: Caleb
+    family-names: McDougal
+    affiliation: "Texas A&M University"
+version: 1.0.0
+date-released: "2026-10-21"
+license: MIT
+repository-code: "https://github.com/caleb-mcdougal-tamu/Energy-Lens"
+keywords:
+  - energy assessment
+  - energy audit
+  - field photos
+  - Google Drive
+  - web app

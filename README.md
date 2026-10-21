@@ -104,3 +104,7 @@ src/
 ```
 
 Built with React, Vite, Tailwind CSS, shadcn/ui, and TanStack Query.
+
+## License and citation
+
+Released under the [MIT License](LICENSE). If you use Energy Lens in your work, please cite it using the metadata in [CITATION.cff](CITATION.cff) (GitHub's **Cite this repository** button generates APA and BibTeX from it).
