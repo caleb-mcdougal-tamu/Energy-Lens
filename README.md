@@ -1,5 +1,7 @@
 # Energy Lens
 
+An industrial energy assessment photo management app.
+
 Energy Lens is a mobile-friendly web app for organizing energy assessment field photos by site, equipment type, and piece of equipment. You can tag each photo (Nameplate, Equipment, Screen, Logger, Data Collection, Measurement, Team), browse and retag photos in a full-screen viewer, and export an assessment as a PDF report or a ZIP of neatly named photos.
 
 There is no backend or database. All data lives in each user's own **Google Drive**, so hosting is free. The app is a static site; Vercel's free tier works well.
