@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { Archive, Loader2, Share2, AlertCircle } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Archive, Loader2, Share2, Download, AlertCircle } from "lucide-react";
 import { buildArchive } from "@/lib/buildArchive";
+import { saveExport, exportStamp } from "@/api/db";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -37,42 +39,61 @@ function downloadFile(file) {
 
 const estimateMb = (n) => Math.round(n * 0.45);
 
+// "Acme.zip" -> "Acme_2026-10-21_1430.zip"
+const withStamp = (filename, stamp) => filename.replace(/(\.zip)?$/i, `_${stamp}.zip`);
+
 export default function ZipButton({ assessment, photoCount = 0 }) {
-  const [phase, setPhase] = useState("idle"); // idle | building | done | error
+  const qc = useQueryClient();
+  const [phase, setPhase] = useState("idle"); // idle | building | saving | done | error
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [splitDialog, setSplitDialog] = useState(false);
   const [lastFiles, setLastFiles] = useState([]);
+  const [saveFailed, setSaveFailed] = useState(false);
 
   const shareSupported = useMemo(() => canShareFiles(), []);
-  const busy = phase === "building";
+  const busy = phase === "building" || phase === "saving";
 
   const runBuild = async (split) => {
     setPhase("building");
     setProgress({ current: 0, total: photoCount || 0 });
     setLastFiles([]);
+    setSaveFailed(false);
+    let files;
     try {
       const result = await buildArchive(assessment, {
         onProgress: (current, total) => setProgress({ current, total }),
         split,
       });
-
-      let files;
-      if (result.split) {
-        files = result.results.map(
-          (r) => new File([r.blob], r.filename, { type: "application/zip" })
-        );
-        files.forEach(downloadFile);
-      } else {
-        const file = new File([result.blob], result.filename, { type: "application/zip" });
-        files = [file];
-        downloadFile(file);
-      }
+      const stamp = exportStamp();
+      const parts = result.split ? result.results : [result];
+      files = parts.map(
+        (r) => new File([r.blob], withStamp(r.filename, stamp), { type: "application/zip" })
+      );
+      files.forEach(downloadFile);
       setLastFiles(files);
-      setPhase("done");
     } catch (e) {
       console.error(e);
       setPhase("error");
+      return;
     }
+
+    // Keep a copy in the assessment's Exports folder in Drive. Split
+    // archives are all saved; only a single archive becomes "Last archive".
+    setPhase("saving");
+    try {
+      for (const file of files) {
+        await saveExport(assessment, file, {
+          filename: file.name,
+          mimeType: "application/zip",
+          latestKey: files.length === 1 ? "zip_file_id" : undefined,
+        });
+      }
+      qc.invalidateQueries({ queryKey: ["assessment", assessment.id] });
+    } catch (e) {
+      console.error(e);
+      setSaveFailed(true);
+    }
+    setPhase("done");
   };
 
   const confirmSingleSize = () =>
@@ -114,6 +135,8 @@ export default function ZipButton({ assessment, photoCount = 0 }) {
   const label =
     phase === "building"
       ? `Building ${progress.current}/${progress.total || "…"}`
+      : phase === "saving"
+      ? "Saving to Drive…"
       : "Download ZIP";
 
   return (
@@ -137,9 +160,25 @@ export default function ZipButton({ assessment, photoCount = 0 }) {
           </button>
         )}
 
+        {assessment?.zip_file_url && (
+          <a
+            href={assessment.zip_file_url}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 h-9 px-3.5 rounded-full border border-neutral-200 bg-white text-neutral-700 text-sm font-medium hover:bg-neutral-50"
+          >
+            <Download className="h-4 w-4" /> Last archive
+          </a>
+        )}
+
         {phase === "error" && (
           <span className="flex items-center gap-1 text-sm text-red-500">
             <AlertCircle className="h-4 w-4" /> Failed
+          </span>
+        )}
+        {saveFailed && (
+          <span className="flex items-center gap-1 text-sm text-amber-600">
+            <AlertCircle className="h-4 w-4" /> Downloaded, but couldn&rsquo;t save a copy to Drive
           </span>
         )}
       </div>

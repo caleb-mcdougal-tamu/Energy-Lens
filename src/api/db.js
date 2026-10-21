@@ -7,7 +7,7 @@
 //         photo.jpg               type-level photo
 //         <Equipment>/            any subfolder of a type
 //           photo.jpg
-//       Exports/                  generated PDF reports (el_kind = "exports")
+//       Exports/                  saved PDF reports and ZIPs (el_kind = "exports")
 //
 // Record fields (photo tag, sort order, site, ...) are stored as public Drive
 // file `properties`, so anyone the assessment folder is shared with sees the
@@ -62,6 +62,8 @@ function toAssessment(f) {
     created_date: f.createdTime,
     report_file_id: p.report_file_id || "",
     report_file_url: p.report_file_id ? fileUrl(p.report_file_id) : "",
+    zip_file_id: p.zip_file_id || "",
+    zip_file_url: p.zip_file_id ? fileUrl(p.zip_file_id) : "",
     structure_version: p.structure_version || "",
     shared: owner ? !owner.me : true,
     drive_url: folderUrl(f.id),
@@ -331,25 +333,47 @@ export function deletePhoto(id) {
 
 // ---- Exports -------------------------------------------------------------------
 
-async function getExportsFolderId(assessmentId) {
+// Cached per assessment so a PDF and a ZIP saved at the same time don't each
+// create their own Exports folder.
+const exportsFolders = new Map();
+
+async function findOrCreateExportsFolder(assessmentId) {
   const found = await listChildren(
     [assessmentId],
     `${FOLDER_QUERY} and properties has { key='el_kind' and value='exports' }`,
-    { fields: "id" }
+    { fields: "id,createdTime" }
   );
-  if (found.length) return found[0].id;
+  if (found.length) {
+    found.sort((a, b) => a.createdTime.localeCompare(b.createdTime));
+    return found[0].id;
+  }
   const f = await createFolder(EXPORTS_NAME, assessmentId, { properties: { el_kind: "exports" } });
   return f.id;
 }
 
-// Saves a generated report PDF into the assessment's Exports folder and
-// remembers it as the latest report (the previous one goes to the trash).
-export async function saveReport(assessment, blob, filename) {
+function getExportsFolderId(assessmentId) {
+  if (!exportsFolders.has(assessmentId)) {
+    const p = findOrCreateExportsFolder(assessmentId);
+    p.catch(() => exportsFolders.delete(assessmentId));
+    exportsFolders.set(assessmentId, p);
+  }
+  return exportsFolders.get(assessmentId);
+}
+
+// Local date-time for export file names, e.g. "2026-10-21_1430".
+export function exportStamp(d = new Date()) {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+}
+
+// Saves a copy of a generated PDF report or ZIP archive into the assessment's
+// Exports folder (beside the equipment type folders). Earlier exports are
+// kept as history; `latestKey` ("report_file_id" / "zip_file_id") records the
+// newest one on the assessment for the "Last report" / "Last archive" links.
+export async function saveExport(assessment, blob, { filename, mimeType, latestKey }) {
   const parent = await getExportsFolderId(assessment.id);
-  const f = await uploadFile(blob, { name: filename, mimeType: "application/pdf", parents: [parent] });
-  const previous = assessment.report_file_id;
-  const updated = await updateAssessment(assessment.id, { report_file_id: f.id });
-  if (previous && previous !== f.id) await trashFile(previous).catch(() => {});
-  return updated;
+  const f = await uploadFile(blob, { name: filename, mimeType, parents: [parent] });
+  if (latestKey) await updateAssessment(assessment.id, { [latestKey]: f.id });
+  return f;
 }
 

@@ -1,54 +1,66 @@
 import React, { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { FileText, Loader2, Download, AlertCircle } from "lucide-react";
-import { saveReport } from "@/api/db";
+import { saveExport, exportStamp } from "@/api/db";
 import { generateReport } from "@/lib/generateReport";
 
 export default function ReportButton({ assessment }) {
   const qc = useQueryClient();
   const [phase, setPhase] = useState("idle"); // idle | generating | uploading | done | error
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [saveFailed, setSaveFailed] = useState(false);
 
   const busy = phase === "generating" || phase === "uploading";
 
   const handleGenerate = async () => {
     if (busy) return;
     setPhase("generating");
+    setSaveFailed(false);
     setProgress({ current: 0, total: 0 });
+    let blob;
     try {
-      const blob = await generateReport(assessment, ({ current, total }) =>
+      blob = await generateReport(assessment, ({ current, total }) =>
         setProgress({ current, total })
       );
-
-      // Direct download
-      const filename = `${(assessment.name || "assessment").replace(/[^\w\-]+/g, "_")}-report.pdf`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-
-      // Save to the assessment's Exports folder in Drive for re-download
-      setPhase("uploading");
-      await saveReport(assessment, blob, filename);
-      qc.invalidateQueries({ queryKey: ["assessment", assessment.id] });
-      setPhase("done");
     } catch (e) {
       console.error(e);
       setPhase("error");
+      return;
     }
+
+    // Direct download
+    const base = (assessment.name || "assessment").replace(/[^\w\-]+/g, "_");
+    const filename = `${base}-report_${exportStamp()}.pdf`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+    // Keep a copy in the assessment's Exports folder in Drive
+    setPhase("uploading");
+    try {
+      await saveExport(assessment, blob, {
+        filename,
+        mimeType: "application/pdf",
+        latestKey: "report_file_id",
+      });
+      qc.invalidateQueries({ queryKey: ["assessment", assessment.id] });
+    } catch (e) {
+      console.error(e);
+      setSaveFailed(true);
+    }
+    setPhase("done");
   };
 
   const label =
     phase === "generating"
       ? `Generating ${progress.current}/${progress.total || "…"}`
       : phase === "uploading"
-      ? "Saving…"
-      : phase === "done"
-      ? "Generate PDF"
+      ? "Saving to Drive…"
       : "Generate PDF";
 
   return (
@@ -80,6 +92,11 @@ export default function ReportButton({ assessment }) {
       {phase === "error" && (
         <span className="flex items-center gap-1 text-sm text-red-500">
           <AlertCircle className="h-4 w-4" /> Failed
+        </span>
+      )}
+      {saveFailed && (
+        <span className="flex items-center gap-1 text-sm text-amber-600">
+          <AlertCircle className="h-4 w-4" /> Downloaded, but couldn&rsquo;t save a copy to Drive
         </span>
       )}
     </div>

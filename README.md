@@ -20,13 +20,14 @@ My Drive/
       │   ├─ photo_….jpg            ← type-level photo
       │   └─ Compressor 1/          ← equipment
       │       └─ photo_….jpg
-      └─ Exports/                   ← generated PDF reports
+      └─ Exports/                   ← every PDF report and ZIP you generate (timestamped)
 ```
 
 - **Photos are ordinary Drive files.** Open, download, or share them from Drive like any other file.
 - **Tags and other details** (photo tag, capture time, site location, sort order) are saved as hidden Drive file *properties*. They travel with the files and show up for everyone with access.
 - **Photos from the phone or computer:** *Camera* takes a photo; *Library* picks images from the phone's photo library or the computer's files. Images are resized to JPEG before upload.
 - **Photos already in Drive:** *Drive* opens an in-app browser for My Drive, Shared with me, and shared drives. The photos you pick are **copied** into the equipment folder and the originals stay where they were. You can also drop images straight into an assessment's folders in Drive; they appear in the app tagged `EQUIPMENT` until retagged.
+- **Exports:** each *Generate PDF* or *Download ZIP* also saves a copy to the assessment's `Exports` folder, named with the date and time (for example `Acme_Plant_Audit_2026-10-21_1430.zip`), so earlier versions are kept. *Last report* and *Last archive* open the newest ones in Drive.
 - **Deleting** an assessment, type, equipment item, or photo moves it to the owner's Drive trash, where it can be restored for 30 days.
 
 ### Working as a team
